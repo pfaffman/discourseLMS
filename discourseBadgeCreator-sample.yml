@@ -1,0 +1,19 @@
+# copy this file to discourseBadgeCreator.yml or ~/.discourseBadgeCreator.yml
+[DEFAULT]
+API_USERNAME=username
+API_KEY=key
+DISCOURSE_URL=https://example.com
+APPROVAL_GROUP=Leader
+TAG_CATEGORY=%%completions%%
+BADGE_GROUPING_ID=7 # TODO: document how to figure this out
+ALLOW_TITLE=false # whether to allow this badge to be used as a title
+MULTIPLE_GRANT=true # can this badge be awarded multiple times?
+BADGE_ENABLED=true # make false for testing
+LIKES_FOR_GOLD=3 # how many total likes require for "gold" badge version
+# These probably should not be changed
+LISTABLE=true # does this badge appear in public lists
+AUTO_REVOKE=false 
+SHOW_POSTS=true
+TARGET_POSTS=true 
+TRIGGER=2 # 2 == "when user edits or creates a post" 
+
