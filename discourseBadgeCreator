@@ -5,9 +5,11 @@ import sys
 from os.path import expanduser
 
 config = configparser.ConfigParser()
-if os.path.isfile("~/.discourseBadgeCreator.yml"):
-    config.read(expanduser("~/.discourseBadgeCreator.yml"))
-    print ("Read config from home directory.")
+
+config_file=expanduser("~/.discourseBadgeCreator.yml")
+if os.path.isfile(config_file):
+    config.read(config_file)
+    print ("Read {0}".format(config_file))
 elif os.path.isfile("discourseBadgeCreator.yml"):
     config.read("discourseBadgeCreator.yml")
     print ("Read config from {0}".format(os.getcwd()))
