@@ -4,6 +4,8 @@ import argparse
 import json
 import webbrowser
 
+group="edm510" # todo: add to prefs and/or arguments
+
 parser = argparse.ArgumentParser()
 parser.add_argument("bronze")
 parser.add_argument("silver")
@@ -15,6 +17,14 @@ silver = args.silver
 gold = args.gold
 
 badgeUrl = 'https://literatecomputing.com/user_badges.json?badge_id={0}'
+groupUrl = 'https://literatecomputing.com/groups/{0}/members.json'.format(group)
+
+groupIDs = []
+with urllib.request.urlopen(groupUrl) as response:
+    groupMembers = json.loads(response.read().decode("utf-8"))['members']
+
+for member in groupMembers:
+    groupIDs.append(member['username'])
 
 printed={}
 for badgeColor in (gold, silver, bronze):
@@ -24,19 +34,28 @@ for badgeColor in (gold, silver, bronze):
 
     memberinfo=json.loads(badges)
     users={}
-    print ("\n\n-------------------- Badge: {0}({1}) --------------------".format(memberinfo['badges'][0]['name'], memberinfo['badges'][0]['id']))
-    for member in (memberinfo['users']):
+    try:
+        badge_name = memberinfo['badges'][0]['name']
+        badge_id = memberinfo['badges'][0]['id']
+        members = memberinfo['users']
+    except:
+        badge_name = "No members assigned"
+        badge_id = "?"
+        members = ""
+        pass
+
+    print ("\n\n-------------------- Badge: {0}({1}) --------------------".format(badge_name, badge_id))
+    for member in (members):
         users[(member['id'])]=member['username']
 
     for badge in (memberinfo['user_badge_info']['user_badges']):
         if badge['user_id'] in printed:
             url=""
         else:
-            url="http://literatecomputing.com/t/{0}".format(badge['topic_id'])
-            printed[badge['user_id']]=badgeColor
-        print("user_id: {0} {1}".format(users[badge['user_id']], url))
-        if (badgeColor == bronze) and (url != ""):
-            if args.open:
-                webbrowser.open(url)
-
-
+            if users[badge['user_id']] in groupIDs:
+                url="http://literatecomputing.com/t/{0}".format(badge['topic_id'])
+                printed[badge['user_id']]=badgeColor
+                print("{0}: {1}".format(users[badge['user_id']], url))
+                if (badgeColor == bronze) and (url != ""):
+                    if args.open:
+                        webbrowser.open(url)
