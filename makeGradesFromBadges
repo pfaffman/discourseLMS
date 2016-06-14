@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+import argparse
+import csv
+import json
+import operator
+import urllib.request
+import os
+import webbrowser
+
+parser = argparse.ArgumentParser()
+parser.add_argument("sakaiGradeFile", help="Sakai grades.csv file")
+parser.add_argument("bronze", help="ID of bronze badge")
+parser.add_argument("silver", help="ID of silver badge")
+parser.add_argument("gold", help="ID of gold badge")
+parser.add_argument("--bpoints", help="Points for bronze badge", default=75)
+parser.add_argument("--spoints", help="Points for silver badge", default=95)
+parser.add_argument("--gpoints", help="Points for gold badge", default=100)
+
+args = parser.parse_args()
+bronze = args.bronze
+silver = args.silver
+gold = args.gold
+GRADES = args.sakaiGradeFile
+bpoints = args.bpoints
+spoints = args.spoints
+gpoints = args.gpoints
+
+# TODO: Move these into configurable variables
+STUDENTMAP = "/Users/pfaffman/usa/courses/edm510-2016-summer/studentmap.csv"
+badgeUrl = 'https://literatecomputing.com/user_badges.json?badge_id={0}'
+searchUrl = 'https://literatecomputing.com/search?q=user%3A{0}'
+
+outfileName = GRADES +".new"
+outfile = open(outfileName, "w", newline='')
+
+# Build map of jnumber to userid
+userid = []
+umap = {}
+
+userJnumber = {}
+jnumberUser = {}
+badgeGrade = {}
+
+with open(STUDENTMAP, "r") as infile:
+    studentmap = csv.DictReader(infile)
+    for row in studentmap:
+        # print ("{0}:{1}".format(row['Userid'], row['ID']))
+        userJnumber[row['Userid']] = row['ID']
+        jnumberUser[row['ID']] = row['Userid']
+        badgeGrade[row['Userid']] = 0
+
+for badgeColor, points in zip((bronze, silver, gold), (bpoints, spoints, gpoints)):
+    with urllib.request.urlopen(badgeUrl.format(str(badgeColor))) as response:
+        badges = response.read().decode("utf-8")
+
+    memberinfo=json.loads(badges)
+    if len(memberinfo) > 1:
+        print ("{0}({1}):".format(memberinfo['badges'][0]['name'], memberinfo['badges'][0]['id']))
+        for member in (memberinfo['users']):
+                print("{0} gets {1} points!".format(member['username'], points))
+                badgeGrade[member['username']] = points
+
+        print ("")
+
+
+for username in userJnumber.keys():
+    print ("{0} ({1}) got a {2}".format(username,
+                                        userJnumber[username],
+                                        badgeGrade[username]))
+    if badgeGrade[username]==0:
+        webbrowser.open(searchUrl.format(username))
+
+
+#writer.writerow(["Userid","DisplayID","ID","LastName","FirstName","grade"])
+
+print ("Writing . . .")
+
+writer  = csv.writer(outfile, lineterminator="\n")
+grades = {}
+print ("Opening ", outfileName)
+with open(GRADES, "r") as infile:
+    assignment = infile.readline();
+    skip = infile.readline();
+    fieldnames = infile.readline();
+
+    outfile.write(assignment)
+    outfile.write(skip)
+    outfile.write(fieldnames)
+    studentmap = csv.DictReader(infile, fieldnames=["DisplayID","ID","LastName","FirstName","grade"])
+
+    for row in studentmap:
+        print ("{0},{1},{2},{3},{4}".format(row['DisplayID'],
+                                                row['ID'],
+                                                row['LastName'],
+                                                row['FirstName'],
+                                                badgeGrade[jnumberUser[row['ID']]]
+                                                ))
+        writer.writerow([row['DisplayID'], row['ID'],
+                                                row['LastName'],
+                                                row['FirstName'],
+                                                badgeGrade[jnumberUser[row['ID']]]
+                                                ])
+
+outfile.close()
+
+print("Wrote ", outfileName)
+os.rename(outfileName, GRADES)
