@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+import os.path
+import configparser
+import sys
+import json, requests
+from os.path import expanduser
+import codecs
+import re
+
+config = configparser.ConfigParser()
+
+config_file=expanduser("~/.discourseBadgeCreator.yml")
+if os.path.isfile(config_file):
+    config.read(config_file)
+    print ("Reading config from: {0}".format(config_file))
+elif os.path.isfile("discourseBadgeCreator.yml"):
+    config.read("discourseBadgeCreator.yml")
+    print ("Read config from {0}".format(os.getcwd()))
+else:
+    print("Missing config file. See discourseBadgeCreator-sample.yml")
+    sys.exit(0)
+
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+import urllib.parse
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
+
+# GET STUFF from config file
+API_USERNAME = config['DEFAULT']['API_USERNAME']
+API_KEY = config['DEFAULT']['API_KEY']
+DISCOURSE_URL = config['DEFAULT']['DISCOURSE_URL']
+APPROVAL_GROUP = config['DEFAULT']['APPROVAL_GROUP']
+TAG_CATEGORY = config['DEFAULT']['TAG_CATEGORY']
+BADGE_GROUPING_ID = config['DEFAULT']['BADGE_GROUPING_ID']
+
+
+ALLOW_TITLE = config['DEFAULT']['ALLOW_TITLE']
+MULTIPLE_GRANT = config['DEFAULT']['MULTIPLE_GRANT']
+LISTABLE = config['DEFAULT']['LISTABLE']
+AUTO_REVOKE = config['DEFAULT']['AUTO_REVOKE']
+SHOW_POSTS = config['DEFAULT']['SHOW_POSTS']
+TARGET_POSTS = config['DEFAULT']['TARGET_POSTS']
+BADGE_ENABLED = config['DEFAULT']['BADGE_ENABLED']
+LIKES_FOR_GOLD = config['DEFAULT']['LIKES_FOR_GOLD']
+TRIGGER = config['DEFAULT']['TRIGGER']
+
+# END config.yml
+
+import argparse
+parser = argparse.ArgumentParser()
+args = parser.parse_args()
+
+url = DISCOURSE_URL + '/admin/badges.json'
+
+valuesGet = {'api_username' : API_USERNAME,
+          'api_key' : API_KEY
+}
+
+headers = {'content-type' : 'application/x-www-form-urlencoded; charset=UTF-8',
+           'x-requested-with' : 'XMLHttpRequest',
+           'referer' :'https://literatecomputing.com/admin/badges',
+           'origin' : 'https://literatecomputing.com',
+           'user-agent' : 'discourseBadgeUpdater'}
+
+data = urllib.parse.urlencode(valuesGet)
+data = data.encode('ascii')
+req = urllib.request.Request(url, data, headers, method='GET')
+
+print ("URL: " , url)
+print ("Data: ", data)
+print ("Headers: ", headers)
+
+try:
+    response = urllib.request.urlopen(req)
+    print ('We have badges!')
+    reader = codecs.getreader("utf-8")
+    badgetext = reader(response)
+    badges = json.load(badgetext)
+    bad = 0
+    for b in badges['badges']:
+        query = b['query']
+        if type(query) is str:
+            matchResult = re.search('tcf.value', query)
+            if matchResult:
+                (query, first) = re.subn(r'JOIN topic_custom_fields tcf on t.id = tcf.topic_id','JOIN topic_tags tt on t.id = tt.topic_id \nJOIN tags on tags.id = tt.tag_id', query)
+                (query, second) = re.subn(r"AND tcf.name LIKE 'tags' and tcf.value LIKE ","AND tags.name LIKE ", query)
+
+                if (first + second < 2):
+                    print ("Not changing: {0}(id: {1})".format(b['name'],b['id']))
+                    bad += 1
+                else:
+                    id = b['id']
+                    name = b['name']
+                    url = DISCOURSE_URL + '/admin/badges/' + str(id)
+                    print ("Updating: {0}(id: {1})".format(name,id))
+                    values = {'allow_title' : str(b["allow_title"]).lower(),
+                                    'multiple_grant' : str(b["multiple_grant"]).lower(),
+                                    'listable' : str(b['listable']).lower(),
+                                    'auto_revoke' : str(b['auto_revoke']).lower(),
+                                    'enabled' : str(b["enabled"]).lower(),
+                                    'show_posts' : str(b['show_posts']).lower(),
+                                    'target_posts' : str(b['target_posts']).lower(),
+                                    'icon' : b['icon'],
+                                    'image' : b['image'],
+                                    'name' : b['name'],
+                                    'description' : b['description'],
+                                    'query' : query,
+                                    'badge_grouping_id' : b['badge_grouping_id'],
+                                    'trigger' : b['trigger'],
+                                    'badge_type_id' : b['badge_type_id'],
+                                    'api_username' : API_USERNAME,
+                                    'api_key' : API_KEY
+                                    }
+
+                    data = urllib.parse.urlencode(values)
+                    data = data.encode('ascii')
+                    req = urllib.request.Request(url=url, data=data, headers=headers, method='PUT')
+                    try:
+                        #print (values)
+                        response = urllib.request.urlopen(req)
+                        print ('"{0}" updated.'.format(name))
+                    except HTTPError as e:
+                        if e.code == 422:
+                            print ("Error updating badge {0}.".format(name))
+                        else:
+                            print ("Darn. Error on {1}. Response code: '{0}'".format(e.code, name))
+                            pass
+
+
+
+    print ("Bad: ", bad)
+
+except HTTPError as e:
+        if e.code == 422:
+            print ("Error creating badge. Does '{0}' exist already?".format("something"))
+        else:
+            print ("Darn. Response code: '{0}'".format(e.code))
+        pass
