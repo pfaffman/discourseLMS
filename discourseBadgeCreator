@@ -52,7 +52,7 @@ parser.add_argument("title", help="Badge title")
 parser.add_argument("icon", help="Icon for badge")
 parser.add_argument("tag", help="Post tag required for badge")
 parser.add_argument("--group", help="Group name for approvals", default=APPROVAL_GROUP)
-parser.add_argument("--enabled", help="Whether badges should be enabled when created", 
+parser.add_argument("--enabled", help="Whether badges should be enabled when created",
                     default=BADGE_ENABLED)
 parser.add_argument("--groupID", help="Grouping ID for badge", default=BADGE_GROUPING_ID)
 parser.add_argument("--multiple", help="Allow badge to be given multiple times", default=MULTIPLE_GRANT)
@@ -84,11 +84,12 @@ titleGold = title + ": Golden"
 queryBronze = """SELECT p.user_id, min(p.created_at) granted_at, MIN(p.id) post_id
 FROM badge_posts p
 JOIN topics t ON t.id = p.topic_id
-JOIN topic_custom_fields tcf on t.id = tcf.topic_id
+JOIN topic_tags tt on t.id = tt.topic_id
+JOIN tags on tags.id = tt.tag_id
 WHERE category_id = ANY (
   SELECT id FROM categories WHERE name ilike '{category}'
 ) AND p.post_number = 1
-AND tcf.name LIKE 'tags' and tcf.value LIKE '{tag}'
+AND tags.name LIKE '{tag}'
 and (:backfill OR ( p.id IN (:post_ids) ))
 GROUP BY p.user_id
 """.format(approvalGroup=approvalGroup, category=TAG_CATEGORY, tag=tag)
@@ -97,21 +98,22 @@ querySilver="""
 SELECT p.user_id, min(p.created_at) granted_at, MIN(p.id) post_id
 FROM badge_posts p
 JOIN topics t ON t.id = p.topic_id
-JOIN topic_custom_fields tcf on t.id = tcf.topic_id
-JOIN post_actions pa ON pa.post_id = p.id AND 
+JOIN topic_tags tt on t.id = tt.topic_id
+JOIN tags on tags.id = tt.tag_id
+JOIN post_actions pa ON pa.post_id = p.id AND
       post_action_type_id = (
                 SELECT id FROM post_action_types WHERE name_key = 'like'
-       ) AND 
+       ) AND
        pa.user_id IN (
            SELECT gu.user_id
            FROM group_users gu
-           WHERE gu.group_id = ( SELECT id FROM groups WHERE name ilike '{approvalGroup}' ) 
+           WHERE gu.group_id = ( SELECT id FROM groups WHERE name ilike '{approvalGroup}' )
        )
 WHERE category_id = ANY (
   SELECT id FROM categories WHERE name ilike '{category}'
 ) AND p.post_number = 1
 AND p.like_count > 0
-AND tcf.name LIKE 'tags' and tcf.value LIKE '{tag}'
+AND tags.name LIKE '{tag}'
 and (:backfill OR ( p.id IN (:post_ids) ))
 GROUP BY p.user_id
 """.format(approvalGroup=approvalGroup, category=TAG_CATEGORY, tag=tag)
@@ -120,21 +122,22 @@ queryGold="""
 SELECT p.user_id, min(p.created_at) granted_at, MIN(p.id) post_id
 FROM badge_posts p
 JOIN topics t ON t.id = p.topic_id
-JOIN topic_custom_fields tcf on t.id = tcf.topic_id
-JOIN post_actions pa ON pa.post_id = p.id AND 
+JOIN topic_tags tt on t.id = tt.topic_id
+JOIN tags on tags.id = tt.tag_id
+JOIN post_actions pa ON pa.post_id = p.id AND
       post_action_type_id = (
                 SELECT id FROM post_action_types WHERE name_key = 'like'
-       ) AND 
+       ) AND
        pa.user_id IN (
            SELECT gu.user_id
            FROM group_users gu
-           WHERE gu.group_id = ( SELECT id FROM groups WHERE name ilike '{approvalGroup}' ) 
+           WHERE gu.group_id = ( SELECT id FROM groups WHERE name ilike '{approvalGroup}' )
        )
 WHERE category_id = ANY (
   SELECT id FROM categories WHERE name ilike '{category}'
 ) AND p.post_number = 1
 AND p.like_count > {likes}
-AND tcf.name LIKE 'tags' and tcf.value LIKE '{tag}'
+AND tags.name LIKE '{tag}'
 and (:backfill OR ( p.id IN (:post_ids) ))
 GROUP BY p.user_id
 """.format(approvalGroup=approvalGroup, category=TAG_CATEGORY, tag=tag, likes=likesForGold)
@@ -209,10 +212,10 @@ if (verbose):
     pp.pprint(valuesBronze)
 
 data = urllib.parse.urlencode(valuesBronze)
-data = data.encode('ascii') 
+data = data.encode('ascii')
 req = urllib.request.Request(url, data, headers)
 
-try: 
+try:
     response = urllib.request.urlopen(req)
     print ('"{0}" created.'.format(titleBronze))
 except HTTPError as e:
@@ -227,15 +230,15 @@ if (verbose):
     pp.pprint(valuesSilver)
 
 data = urllib.parse.urlencode(valuesSilver)
-data = data.encode('ascii') 
+data = data.encode('ascii')
 req = urllib.request.Request(url, data, headers)
 
 # try: urllib.request.urlopen(req)
-# except URLError as e:    
+# except URLError as e:
 #     print ("\n\n--------------------YO!--------------------\n\n" , e.reason)
 #     print ("\n\nHeaders:\n\n ", e.headers)
 
-try: 
+try:
     response = urllib.request.urlopen(req)
     print ('"{0}" created.'.format(titleSilver))
 except HTTPError as e:
@@ -251,10 +254,10 @@ if (verbose):
     pp.pprint(valuesGold)
 
 data = urllib.parse.urlencode(valuesGold)
-data = data.encode('ascii') 
+data = data.encode('ascii')
 req = urllib.request.Request(url, data, headers)
 
-try: 
+try:
     response = urllib.request.urlopen(req)
     print ('"{0}" created.'.format(titleGold))
 except HTTPError as e:
@@ -263,4 +266,3 @@ except HTTPError as e:
         else:
             print ("Darn. Response code: '{0}'".format(e.code))
         pass
-
